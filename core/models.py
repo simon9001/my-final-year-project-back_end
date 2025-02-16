@@ -55,8 +55,8 @@ class NewsAndEventsManager(models.Manager):
 
 
 class NewsAndEvents(models.Model):
-    title = models.CharField(max_length=200, null=True)
-    summary = models.TextField(max_length=200, blank=True, null=True)
+    title = models.CharField(max_length=1000, null=True)
+    summary = models.TextField(max_length=1000, blank=True, null=True)
     posted_as = models.CharField(choices=POST, max_length=10)
     updated_date = models.DateTimeField(auto_now=True, auto_now_add=False, null=True)
     upload_time = models.DateTimeField(auto_now=False, auto_now_add=True, null=True)

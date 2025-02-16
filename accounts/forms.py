@@ -233,10 +233,10 @@ class StudentAddForm(UserCreationForm):
         required=False,
     )
 
-    # def validate_email(self):
-    #     email = self.cleaned_data['email']
-    #     if User.objects.filter(email__iexact=email, is_active=True).exists():
-    #         raise forms.ValidationError("Email has taken, try another email address. ")
+    def validate_email(self):
+         email = self.cleaned_data['email']
+         if User.objects.filter(email__iexact=email, is_active=True).exists():
+             raise forms.ValidationError("Email has taken, try another email address. ")
 
     class Meta(UserCreationForm.Meta):
         model = User

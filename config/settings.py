@@ -27,10 +27,18 @@ SECRET_KEY = config(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = ["127.0.0.1", "adilmohak1.pythonanywhere.com"]
+ALLOWED_HOSTS = ["192.168.179.36","localhost", "127.0.0.1",]
 
 # change the default user models to our custom model
 AUTH_USER_MODEL = "accounts.User"
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+)
+
+# REST Framework Authentication
+
+
 
 # Application definition
 
@@ -44,16 +52,43 @@ DJANGO_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "dj_rest_auth.registration",
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "corsheaders",
+    
+   
 ]
 
 # Third party apps
 THIRD_PARTY_APPS = [
     "crispy_forms",
     "crispy_bootstrap5",
-    "rest_framework",
     "django_filters",
+    "rest_framework.authtoken",
+    "dj_rest_auth",
+    "django_extensions",
 ]
 
+REST_USE_JWT = True
+
+# JWT Settings
+from datetime import timedelta
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": False,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
 # Custom apps
 PROJECT_APPS = [
     "core.apps.CoreConfig",
@@ -63,6 +98,7 @@ PROJECT_APPS = [
     "search.apps.SearchConfig",
     "quiz.apps.QuizConfig",
     "payments.apps.PaymentsConfig",
+   
 ]
 
 # Combine all apps
@@ -72,15 +108,51 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",  # ✅ Enable CSRF for proper handling
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # ✅ Keep it above Allauth
+    "allauth.account.middleware.AccountMiddleware",  # ✅ Moved below AuthenticationMiddleware
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.middleware.locale.LocaleMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # whitenoise to serve static files
-]
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware"
+    ]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True 
+# ✅ Allow APIs to bypass CSRF (Add this)
+CSRF_COOKIE_NAME = "csrftoken"
+CSRF_COOKIE_HTTPONLY = False  # Ensure this is False for APIs
+SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+ # Allow all API requests (for testing)
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000"
+    ]  # Ensure API calls are allowed
+
+# REST Framework Settings
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+        
+    ],
+}
+
+
+
 
 ROOT_URLCONF = "config.urls"
+
+# Default User Model
+AUTH_USER_MODEL = "accounts.User"
+
+LOGOUT_REDIRECT_URL = '/'
 
 TEMPLATES = [
     {

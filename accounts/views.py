@@ -1,3 +1,4 @@
+from django.views.decorators.csrf import csrf_exempt
 from django.http.response import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -12,6 +13,7 @@ from core.models import Session, Semester
 from course.models import Course
 from result.models import TakenCourse
 from .decorators import admin_required
+
 from .forms import (
     StaffAddForm,
     StudentAddForm,
@@ -29,6 +31,115 @@ from xhtml2pdf import pisa
 from django.template.loader import (
     render_to_string,
 )  # to render a template into a string
+
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+from django.http.response import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login, logout, authenticate
+
+from django.views.decorators.csrf import csrf_exempt
+from django.middleware.csrf import get_token
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+
+# Custom imports
+from core.models import Session, Semester
+from course.models import Course
+from result.models import TakenCourse
+from .decorators import admin_required
+from .models import Student, Parent
+from .serializers import UserSerializer, RegisterSerializer
+from django.http import JsonResponse
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_csrf_token(request):
+    response = JsonResponse({'csrfToken': get_token(request)})  
+    response.set_cookie("csrftoken", get_token(request))  # ✅ Set CSRF Token in Cookie
+    response["X-CSRFToken"] = get_token(request)  # ✅ Include CSRF token in Response Header
+    return response
+
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_user(request):
+    print("Received Data:", request.data)  # Debugging Line ✅
+    
+    serializer = RegisterSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        user = serializer.save()
+        refresh = RefreshToken.for_user(user)
+        response_data = {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': UserSerializer(user).data,
+        }
+        print("Registration Successful:", response_data)  # Debugging Line ✅
+        return Response(response_data, status=status.HTTP_201_CREATED)
+    
+    print("Serializer Errors:", serializer.errors)  # Debugging Line ✅
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_user(request):
+    print("🔹 Raw Request Body:", request.body)  # ✅ Debugging
+    print("🔹 Parsed Request Data:", request.data)  # ✅ Debugging
+
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    if not username or not password:
+        return Response({'error': 'Missing username or password'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = authenticate(username=username, password=password)
+    if user is not None:
+        refresh = RefreshToken.for_user(user)
+        login(request, user)
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': UserSerializer(user).data,
+        })
+    
+    return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_user(request):
+    try:
+        refresh_token = request.data.get('refresh')
+        token = RefreshToken(refresh_token)
+        token.blacklist()
+        logout(request)
+        return Response({'message': 'Successfully logged out'}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_csrf_token(request):
+    return JsonResponse({'csrfToken': get_token(request)})
+
+
+def custom_logout_view(request):
+    logout(request)
+    return redirect('home')  # Redirect to the home page or any other page
 
 
 def validate_username(request):
@@ -52,9 +163,10 @@ def register(request):
     return render(request, "registration/register.html", {"form": form})
 
 
-@login_required
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  # <-- Ensures only logged-in users can access
 def profile(request):
-    """Show profile of any user that fire out the request"""
     current_session = Session.objects.filter(is_current_session=True).first()
     current_semester = Semester.objects.filter(
         is_current_semester=True, session=current_session
@@ -64,46 +176,32 @@ def profile(request):
         courses = Course.objects.filter(
             allocated_course__lecturer__pk=request.user.id
         ).filter(semester=current_semester)
-        return render(
-            request,
-            "accounts/profile.html",
-            {
-                "title": request.user.get_full_name,
-                "courses": courses,
-                "current_session": current_session,
-                "current_semester": current_semester,
-            },
-        )
+        return Response({
+            "title": request.user.get_full_name,
+            "courses": list(courses.values()),
+            "current_session": str(current_session),
+            "current_semester": str(current_semester),
+        })
+
     elif request.user.is_student:
         level = Student.objects.get(student__pk=request.user.id)
-        try:
-            parent = Parent.objects.get(student=level)
-        except:
-            parent = "no parent set"
+        parent = Parent.objects.filter(student=level).first()
         courses = TakenCourse.objects.filter(
             student__student__id=request.user.id, course__level=level.level
         )
-        context = {
+        return Response({
             "title": request.user.get_full_name,
-            "parent": parent,
-            "courses": courses,
-            "level": level,
-            "current_session": current_session,
-            "current_semester": current_semester,
-        }
-        return render(request, "accounts/profile.html", context)
-    else:
-        staff = User.objects.filter(is_lecturer=True)
-        return render(
-            request,
-            "accounts/profile.html",
-            {
-                "title": request.user.get_full_name,
-                "staff": staff,
-                "current_session": current_session,
-                "current_semester": current_semester,
-            },
-        )
+            "parent": str(parent),
+            "courses": list(courses.values()),
+            "level": str(level),
+            "current_session": str(current_session),
+            "current_semester": str(current_semester),
+        })
+
+    return Response({
+        "title": request.user.get_full_name,
+        "message": "User type not recognized"
+    })
 
 
 # function that generate pdf by taking Django template and its context,
@@ -530,6 +628,10 @@ class ParentAdd(CreateView):
     model = Parent
     form_class = ParentAddForm
     template_name = "accounts/parent_form.html"
+
+
+
+
 
 
 # def parent_add(request):

@@ -41,42 +41,36 @@
             <tr>
                 <td> {{ forloop.counter }}.</td>
                 <td><a href="{{ course.lecturer.get_absolute_url }}">{{ course.lecturer.get_full_name }}</a></td>
-                <td><div class="flex">{% for i in course.courses.all %}
-                        <div class="flex"><a class="edit-btn" href="{{ i.get_absolute_url }}">{{ i }}</a></div>
-                    {% endfor %}</div>
+                <td>
+                    <div class="flex">
+                        {% for i in course.courses.all %}
+                            <div class="flex">
+                                <a class="edit-btn" href="{{ i.get_absolute_url }}">{{ i }}</a>
+                            </div>
+                        {% empty %}
+                            <p>No courses available</p>
+                        {% endfor %}
+                    </div>
                 </td>
                 {% if request.user.is_superuser %}
-                <td><div class="update-delete">
-                    <a href="{% url 'edit_allocated_course' pk=course.pk %}" class="update" title="{% trans 'Edit or Update' %}">
-                        <i class="fas fa-edit"></i>
-                    </a>
-                    <a href="{% url 'course_deallocate' pk=course.pk %}" class="delete" title="{% trans 'Deallocate' %}">
-                        <i class="fas fa-trash-alt"></i>
-                    </a>
+                <td>
+                    <div class="update-delete">
+                        <a href="{% url 'edit_allocated_course' pk=course.pk %}" class="update" title="{% trans 'Edit or Update' %}">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <a href="{% url 'course_deallocate' pk=course.pk %}" class="delete" title="{% trans 'Deallocate' %}">
+                            <i class="fas fa-trash-alt"></i>
+                        </a>
                     </div>
                 </td>
                 {% endif %}
             </tr>
             {% empty %}
             <tr>
-              <td></td>
-              <td></td>
-              <td>
-                <span class="text-danger">{% trans 'No Course Allocated.' %}
-                    {% if request.user.is_superuser %}
-                    <a href="{% url 'course_allocation' %}">
-                    <i class="primary" style="font-size: 22px;">
-                        {% trans 'Allocate now' %}
-                    </i>
-                    {% endif %}
-                    </a>
-                </span>
-                </td>
-              <td></td>
+                <td></td>
             </tr>
-
+            {% endfor %}
         </tbody>
-        {% endfor %}
     </table>
 </div>
 {% endblock content %}
